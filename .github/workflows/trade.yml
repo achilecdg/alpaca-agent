@@ -10,7 +10,7 @@ on:
     # Chaque lundi à 15h30 UTC -> milieu de matinée à New York (marché US ouvert),
     # que ce soit en heure d'été ou d'hiver. Format cron : "min heure * * jour".
     # Ex. tous les jours ouvrés : "30 15 * * 1-5"
-    - cron: "30 15 * * 1"
+    - cron: "30 15 * * 1-5"
   workflow_dispatch: {}   # bouton "Run workflow" pour lancer à la main (test)
 
 permissions:
