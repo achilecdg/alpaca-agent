@@ -29,8 +29,8 @@ jobs:
       # --- Config (modifiable ici, ce ne sont pas des secrets) ---
       # PAPER = simulation. Pour le RÉEL : mettre "false" ICI **et** "yes" à la ligne suivante,
       # et remplacer les secrets Alpaca par tes clés LIVE (différentes des clés paper).
-      ALPACA_PAPER: "true"
-      I_UNDERSTAND_LIVE_RISK: "no"
+      ALPACA_PAPER: "false"
+      I_UNDERSTAND_LIVE_RISK: "yes"
 
       WATCHLIST: "AAPL,MSFT,GOOGL,AMZN,NVDA"
       MAX_NOTIONAL_PER_ORDER: "10"
