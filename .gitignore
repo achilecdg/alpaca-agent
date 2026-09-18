@@ -1,0 +1,10 @@
+# Ne JAMAIS committer tes clés
+.env
+
+# Environnement Python
+.venv/
+__pycache__/
+*.pyc
+
+# Logs locaux (sur GitHub Actions, le journal est géré par le workflow)
+cron.log
