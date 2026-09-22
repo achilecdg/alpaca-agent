@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Carnet du bot — journal de trading</title>
+<style>
+  :root{
+    --paper:#FBFAF7; --ink:#1B2430; --muted:#6B7280; --line:#E7E3DA;
+    --card:#FFFFFF; --indigo:#3B4A6B; --up:#2F7A6A; --down:#B4553F;
+    --shadow:0 1px 0 rgba(27,36,48,.04), 0 8px 24px -18px rgba(27,36,48,.35);
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --paper:#14171C; --ink:#EAE7DF; --muted:#9AA1AC; --line:#282D35;
+      --card:#1B1F26; --indigo:#8CA0CC; --up:#5FB39B; --down:#D98A72;
+      --shadow:0 1px 0 rgba(0,0,0,.2), 0 10px 30px -20px rgba(0,0,0,.8);
+    }
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--paper); color:var(--ink);
+    font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:720px; margin:0 auto; padding:32px 20px 80px}
+  .serif{font-family:Georgia,"Times New Roman",serif}
+
+  header{display:flex; justify-content:space-between; align-items:baseline; gap:16px; margin-bottom:28px}
+  header h1{font-size:19px; font-weight:600; margin:0; letter-spacing:-.01em}
+  header .sub{color:var(--muted); font-size:13px; margin-top:2px}
+  .badge{font-size:12px; padding:3px 9px; border-radius:999px; border:1px solid var(--line); color:var(--muted); white-space:nowrap}
+  .badge.reel{color:var(--down); border-color:color-mix(in srgb,var(--down) 40%,var(--line))}
+
+  .date{color:var(--muted); font-size:13px; margin:0 0 6px}
+  .hero{margin:8px 0 36px}
+  .figure{font-family:Georgia,serif; font-size:56px; line-height:1; letter-spacing:-.02em; margin:0}
+  .figure.up{color:var(--up)} .figure.down{color:var(--down)}
+  .figure .cur{font-size:26px; vertical-align:.35em; color:var(--muted); margin-right:2px}
+  .caption{color:var(--muted); font-size:14px; margin-top:10px}
+  .totals{display:flex; gap:28px; margin-top:18px; flex-wrap:wrap}
+  .totals div{font-size:14px}
+  .totals b{font-family:Georgia,serif; font-size:20px; font-weight:400; display:block; margin-top:2px}
+  .totals .up{color:var(--up)} .totals .down{color:var(--down)}
+
+  h2{font-size:13px; font-weight:600; color:var(--muted); margin:34px 0 12px}
+  .choices{display:flex; flex-direction:column; gap:10px}
+  .choice{display:flex; gap:12px; align-items:flex-start; background:var(--card); border:1px solid var(--line);
+          border-radius:12px; padding:12px 14px; box-shadow:var(--shadow)}
+  .tag{font-size:12px; font-weight:600; padding:2px 8px; border-radius:6px; margin-top:1px; white-space:nowrap}
+  .tag.BUY{background:color-mix(in srgb,var(--up) 16%,transparent); color:var(--up)}
+  .tag.SELL{background:color-mix(in srgb,var(--down) 16%,transparent); color:var(--down)}
+  .tag.HOLD{background:color-mix(in srgb,var(--muted) 15%,transparent); color:var(--muted)}
+  .choice .sym{font-weight:600; margin-right:6px}
+  .choice .reason{color:var(--ink)}
+
+  .voice{background:var(--card); border:1px solid var(--line); border-left:3px solid var(--indigo);
+          border-radius:12px; padding:16px 18px; box-shadow:var(--shadow)}
+  .voice p{margin:0}
+  .voice.next{border-left-color:color-mix(in srgb,var(--muted) 60%,var(--line))}
+
+  .chart{margin-top:14px; background:var(--card); border:1px solid var(--line); border-radius:12px;
+         padding:16px; box-shadow:var(--shadow)}
+  .chart svg{display:block; width:100%; height:120px; overflow:visible}
+  .chart .axis{fill:var(--muted); font-size:11px}
+
+  details{margin-top:10px; border-top:1px solid var(--line); padding-top:10px}
+  details summary{cursor:pointer; color:var(--muted); font-size:14px; list-style:none}
+  details summary::-webkit-details-marker{display:none}
+  details summary::before{content:"▸ "; }
+  details[open] summary::before{content:"▾ "}
+  .past{margin-top:14px}
+  .past .day{padding:14px 0; border-top:1px solid var(--line)}
+  .past .day:first-child{border-top:none}
+  .past .dhead{display:flex; justify-content:space-between; font-size:14px}
+  .past .dhead .chg.up{color:var(--up)} .past .dhead .chg.down{color:var(--down)}
+  .past .dbody{color:var(--muted); font-size:14px; margin-top:6px}
+
+  footer{margin-top:48px; color:var(--muted); font-size:12px; line-height:1.6}
+  .empty{text-align:center; padding:60px 0; color:var(--muted)}
+  .empty .serif{font-size:22px; color:var(--ink); display:block; margin-bottom:8px}
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <div class="empty"><span class="serif">Chargement du carnet…</span></div>
+</div>
+
+<script>
+const LOG_URL = "trades_log.jsonl";
+const money = v => (v<0?"-":"") + "$" + Math.abs(v).toFixed(2);
+const pct   = v => (v>=0?"+":"") + v.toFixed(2) + "%";
+const el = (h) => { const t=document.createElement("template"); t.innerHTML=h.trim(); return t.content.firstChild; };
+const esc = (s) => (s||"").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+function frDate(iso){
+  try{ return new Date(iso+"T12:00:00Z").toLocaleDateString("fr-FR",
+    {weekday:"long", day:"numeric", month:"long", year:"numeric"}); }
+  catch(e){ return iso; }
+}
+
+async function load(){
+  let reports=[];
+  try{
+    const res = await fetch(LOG_URL + "?t=" + Date.now());
+    if(!res.ok) throw new Error("no log");
+    const text = await res.text();
+    for(const line of text.split("\n")){
+      const s=line.trim(); if(!s) continue;
+      try{ const o=JSON.parse(s); if(o.type==="daily_report") reports.push(o); }catch(e){}
+    }
+  }catch(e){ /* fichier pas encore là */ }
+
+  const app=document.getElementById("app");
+  app.innerHTML="";
+
+  if(reports.length===0){
+    app.appendChild(el(`<div class="empty">
+      <span class="serif">Le bot n'a pas encore tourné.</span>
+      Sa première passe — ses choix, ses raisons et sa stratégie — apparaîtra ici automatiquement.
+    </div>`));
+    return;
+  }
+
+  reports.sort((a,b)=> (a.date<b.date?-1:a.date>b.date?1:0));
+  const last = reports[reports.length-1];
+  const prev = reports[reports.length-2] || null;
+
+  const change = prev ? (last.equity - prev.equity) : 0;
+  const changePct = prev && prev.equity ? (change/prev.equity*100) : 0;
+  const total = last.equity - last.start_equity;
+  const totalPct = last.start_equity ? (total/last.start_equity*100) : 0;
+  const dir = change>=0 ? "up":"down";
+
+  // ---- Header ----
+  app.appendChild(el(`<header>
+    <div>
+      <h1>Carnet du bot</h1>
+      <div class="sub">Un agent IA qui décide et trade seul. Il s'explique ici chaque jour.</div>
+    </div>
+    <span class="badge ${last.mode==='reel'?'reel':''}">${last.mode==='reel'?'argent réel':'simulation'}</span>
+  </header>`));
+
+  // ---- Hero : performance depuis la dernière passe ----
+  const hero = el(`<div class="hero">
+    <p class="date">${frDate(last.date)}</p>
+    <p class="figure ${dir}"><span class="cur"></span>${(change>=0?'+':'−')+Math.abs(change).toFixed(2)}</p>
+    <p class="caption">${prev ? `variation depuis la passe précédente (${pct(changePct)})`
+                              : `première passe — rien à comparer pour l'instant`}</p>
+    <div class="totals">
+      <div>Valeur du portefeuille <b>${money(last.equity)}</b></div>
+      <div>Depuis le départ <b class="${total>=0?'up':'down'}">${(total>=0?'+':'−')+'$'+Math.abs(total).toFixed(2)} · ${pct(totalPct)}</b></div>
+    </div>
+  </div>`);
+  app.appendChild(hero);
+
+  // ---- Ses choix du jour ----
+  const decisions = Array.isArray(last.decisions)? last.decisions : [];
+  if(decisions.length){
+    app.appendChild(el(`<h2>Ses choix du jour</h2>`));
+    const box = el(`<div class="choices"></div>`);
+    for(const d of decisions){
+      const a=(d.action||"HOLD").toUpperCase();
+      const notion = (a==="BUY" && d.notional)? ` · ${money(Number(d.notional))}` : "";
+      box.appendChild(el(`<div class="choice">
+        <span class="tag ${a}">${a}</span>
+        <div><span class="sym">${esc(d.symbol||"")}${notion}</span><span class="reason">${esc(d.reason||"")}</span></div>
+      </div>`));
+    }
+    app.appendChild(box);
+  }
+
+  // ---- Ce qu'il en dit ----
+  if(last.overall_reasoning){
+    app.appendChild(el(`<h2>Ce qu'il en dit</h2>`));
+    app.appendChild(el(`<div class="voice"><p>${esc(last.overall_reasoning)}</p></div>`));
+  }
+
+  // ---- Sa stratégie pour demain ----
+  if(last.strategie_demain){
+    app.appendChild(el(`<h2>Sa stratégie pour la suite</h2>`));
+    app.appendChild(el(`<div class="voice next"><p>${esc(last.strategie_demain)}</p></div>`));
+  }
+
+  // ---- Courbe de la valeur ----
+  if(reports.length>=2){
+    app.appendChild(el(`<h2>Évolution du portefeuille</h2>`));
+    app.appendChild(el(`<div class="chart">${sparkline(reports)}</div>`));
+  }
+
+  // ---- Historique ----
+  if(reports.length>1){
+    const det = el(`<details><summary>Voir les journées précédentes (${reports.length-1})</summary><div class="past"></div></details>`);
+    const past = det.querySelector(".past");
+    for(let i=reports.length-2;i>=0;i--){
+      const r=reports[i], p=reports[i-1]||null;
+      const c = p ? r.equity-p.equity : 0;
+      const cd = c>=0?"up":"down";
+      const nBuys=(r.decisions||[]).filter(d=>(d.action||"").toUpperCase()==="BUY").length;
+      const nSells=(r.decisions||[]).filter(d=>(d.action||"").toUpperCase()==="SELL").length;
+      const acts=[nBuys?`${nBuys} achat${nBuys>1?'s':''}`:"", nSells?`${nSells} vente${nSells>1?'s':''}`:""].filter(Boolean).join(", ")||"aucun ordre";
+      past.appendChild(el(`<div class="day">
+        <div class="dhead"><span>${frDate(r.date)}</span>
+          <span class="chg ${cd}">${p?((c>=0?'+':'−')+'$'+Math.abs(c).toFixed(2)):money(r.equity)}</span></div>
+        <div class="dbody">${acts} · ${esc((r.overall_reasoning||"").slice(0,140))}${(r.overall_reasoning||"").length>140?'…':''}</div>
+      </div>`));
+    }
+    app.appendChild(det);
+  }
+
+  // ---- Footer ----
+  app.appendChild(el(`<footer>
+    Ce carnet lit le journal que le bot écrit à chaque passe — aucune intervention, aucune retouche.
+    Expérience à but pédagogique : ceci n'est pas un conseil en investissement.
+    Mis à jour à chaque exécution de l'agent.
+  </footer>`));
+}
+
+function sparkline(reports){
+  const W=680, H=110, pad=6;
+  const vals=reports.map(r=>r.equity);
+  const min=Math.min(...vals), max=Math.max(...vals);
+  const span=(max-min)||1;
+  const x=i=> pad + i*(W-2*pad)/(reports.length-1);
+  const y=v=> pad + (H-2*pad)*(1-(v-min)/span);
+  const pts=vals.map((v,i)=>`${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+  const up = vals[vals.length-1]>=vals[0];
+  const col = up? "var(--up)":"var(--down)";
+  const area=`${pad},${H-pad} ${pts} ${(W-pad)},${H-pad}`;
+  return `<svg viewBox="0 0 ${W} ${H+20}" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+    <polygon points="${area}" fill="${col}" opacity="0.08"/>
+    <polyline points="${pts}" fill="none" stroke="${col}" stroke-width="2"
+      stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+    <circle cx="${x(vals.length-1)}" cy="${y(vals[vals.length-1])}" r="3.5" fill="${col}"/>
+    <text class="axis" x="${pad}" y="${H+14}">${frDate(reports[0].date).replace(/ \d{4}$/,'')}</text>
+    <text class="axis" x="${W-pad}" y="${H+14}" text-anchor="end">${frDate(reports[reports.length-1].date).replace(/ \d{4}$/,'')}</text>
+  </svg>`;
+}
+
+load();
+</script>
+</body>
+</html>
