@@ -38,7 +38,7 @@ jobs:
       MAX_DRAWDOWN_PCT: "20"
       LLM_MODEL: "claude-sonnet-5"
       ENABLE_WEB_SEARCH: "true"
-      WEB_SEARCH_MAX_USES: "5"
+      WEB_SEARCH_MAX_USES: "3"
 
     steps:
       - name: Récupérer le code
