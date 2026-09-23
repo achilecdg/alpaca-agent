@@ -137,12 +137,15 @@ def build_clients():
 
 
 def get_start_equity(current_equity: float) -> float:
-    """Mémorise l'équité de départ (référence du kill switch), une fois pour toutes."""
+    """Mémorise l'équité de départ (référence du kill switch et de la performance)."""
     if Config.START_EQUITY_FILE.exists():
         try:
-            return float(Config.START_EQUITY_FILE.read_text().strip())
+            stored = float(Config.START_EQUITY_FILE.read_text().strip())
+            if stored > 0:                 # une valeur <= 0 est invalide (compte pas encore financé)
+                return stored
         except ValueError:
             pass
+    # (re)écrit une référence saine à partir de l'équité réelle du moment
     Config.START_EQUITY_FILE.write_text(str(current_equity))
     return current_equity
 
@@ -194,8 +197,14 @@ STRATÉGIE (fixée par l'utilisateur) :
   tickers de la watchlist AVANT de décider. Si tu ne trouves pas de catalyseur clair et
   récent, préfère HOLD : pas d'actu solide = pas de trade forcé.
 
-Après ton raisonnement, tu renvoies UNIQUEMENT un objet JSON valide (le tout dernier élément
-de ta réponse), sans balises Markdown. Format EXACT :
+Après tes recherches, tu renvoies UNIQUEMENT un objet JSON valide (le tout dernier élément
+de ta réponse), sans balises Markdown.
+
+IMPORTANT : ne rédige PAS de longue analyse en Markdown. Limite tout commentaire à 3-4 lignes
+maximum, puis donne immédiatement le JSON COMPLET. Le JSON est obligatoire et doit toujours
+apparaître en entier — il est prioritaire sur ton analyse.
+
+Format EXACT :
 {
   "decisions": [
     {"action": "BUY", "symbol": "AAPL", "notional": 10.0, "reason": "catalyseur précis + source"},
@@ -203,7 +212,7 @@ de ta réponse), sans balises Markdown. Format EXACT :
     {"action": "HOLD", "symbol": "NVDA", "reason": "..."}
   ],
   "overall_reasoning": "synthèse courte, en français clair, de ta lecture de l'actu et de tes choix du jour (2-4 phrases, lisible par un humain non expert)",
-  "strategie_demain": "en 1-2 phrases, ce que tu comptes surveiller ou faire lors de la prochaine passe"
+  "strategie_globale": "en 1-2 phrases, ta ligne directrice d'ensemble du moment (ta philosophie de gestion actuelle sur ce portefeuille), pas seulement pour la prochaine passe"
 }
 
 Règles :
@@ -211,7 +220,7 @@ Règles :
 - "SELL" : liquide toute la position sur ce ticker (pas de "notional").
 - "HOLD" : ne rien faire.
 - Chaque "reason" doit citer le catalyseur concret qui justifie l'action, en français.
-- "overall_reasoning" et "strategie_demain" sont destinés à être affichés sur un site public :
+- "overall_reasoning" et "strategie_globale" sont destinés à être affichés sur un site public :
   écris-les pour être compris par ta communauté, pas seulement par un trader.
 - Petit capital, objectif d'apprentissage : mieux vaut peu d'ordres bien motivés."""
 
@@ -226,7 +235,7 @@ def ask_claude(llm: anthropic.Anthropic, context: dict) -> dict:
 
     kwargs = dict(
         model=Config.LLM_MODEL,
-        max_tokens=2000,
+        max_tokens=4000,
         system=SYSTEM_PROMPT,
         messages=[{"role": "user", "content": user_msg}],
     )
@@ -387,7 +396,7 @@ def run_once() -> None:
         "mode": "reel" if not Config.PAPER else "paper",
         "decisions": result.get("decisions", []),
         "overall_reasoning": result.get("overall_reasoning", ""),
-        "strategie_demain": result.get("strategie_demain", ""),
+        "strategie_globale": result.get("strategie_globale", ""),
     })
 
 
